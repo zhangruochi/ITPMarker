@@ -7,8 +7,6 @@
 conda env create -f environment.yaml
 ```
 
-## Download dataset
-
 ## Preprocess dataset
 
 ```

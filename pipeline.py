@@ -34,7 +34,7 @@ def data_split(data):
 
     transcriptome_data = data["transcriptome_data"]
     clinical_data = data["clinical_data"]
-    clinical_data = clinical_data.loc[:, ["性别", "年龄"]]
+    clinical_data = clinical_data.loc[:, ["gender", "age"]]
     merged_data = pd.merge(transcriptome_data,
                            clinical_data,
                            left_index=True,
@@ -48,7 +48,8 @@ def data_split(data):
     X_train, X_test, y_train, y_test = train_test_split(merged_data,
                                                         label,
                                                         test_size=0.2,
-                                                        random_state=42)
+                                                        stratify=label,
+                                                        random_state=0)
 
     return X_train, X_test, y_train, y_test
 
@@ -119,9 +120,10 @@ def get_feature_preprocessor(rna_features):
 
     feature_preprocessor = ColumnTransformer(
         transformers=[('rna_preprocessor', rna_preprocessor,
-                       rna_features), ('age_scaler', StandardScaler(), ['年龄']),
+                       rna_features), ('age_scaler', StandardScaler(),
+                                       ['age']),
                       ('sex_encoder', OneHotEncoder(handle_unknown='ignore'),
-                       ['性别'])])
+                       ['gender'])])
 
     return feature_preprocessor
 
@@ -136,57 +138,53 @@ def get_feature_union():
     return feature_union_pipleine
 
 
-def get_pipeline(rna_features, selector = None):
+def get_pipeline(rna_features, selector=None):
     if selector is None:
         # default feature selection algorithm is lasso
-        selector = SelectFromModel(LogisticRegression(
-                    penalty='l1', solver="liblinear", random_state=0), max_features=50)
+        selector = SelectFromModel(LogisticRegression(penalty='l1',
+                                                      solver="liblinear",
+                                                      random_state=0),
+                                   max_features=50)
 
     pipeline = Pipeline(
-        steps = [
-            ("preprocessor", ColumnTransformer(
-                transformers = [
-                    ('rna_preprocessor', Pipeline(
-                        steps = [
-                            ('rna_scaler', StandardScaler()),
-                            ("rna_selector", selector),
-                            ("rna_decorrelated", FeatureDecorrelated(threshold = 0.9))
-                        ]), rna_features),
-                    ('age_scaler', StandardScaler(), ['年龄']),
-                    ('sex_encoder', OneHotEncoder(handle_unknown='ignore'), ['性别'])
-                ]
-            )),
-            ("feature_union", get_feature_union()),
-            ("classifier", RandomForestClassifier(random_state=42))
-        ]
-    )
+        steps=[("preprocessor",
+                ColumnTransformer(transformers=[(
+                    'rna_preprocessor',
+                    Pipeline(
+                        steps=[('rna_scaler',
+                                StandardScaler()), ("rna_selector", selector),
+                               ("rna_decorrelated",
+                                FeatureDecorrelated(threshold=0.9))]),
+                    rna_features), ('age_scaler', StandardScaler(), ['age']),
+                                                ('sex_encoder',
+                                                 OneHotEncoder(
+                                                     handle_unknown='ignore'),
+                                                 ['gender'])])
+                ), ("feature_union", get_feature_union()
+                    ), ("classifier",
+                        RandomForestClassifier(random_state=42))])
 
     return pipeline
 
 
 def get_ifs_pipeline(rna_features, features):
     ifs_pipeline = Pipeline(
-        steps = [
-            ("preprocessor", ColumnTransformer(
-                transformers = [
-                    ("IFS",StandardScaler(), features),
-                    ('age_scaler', StandardScaler(), ['年龄']),
-                    ('sex_encoder', OneHotEncoder(handle_unknown='ignore'), ['性别'])
-                ]
-            )),
-            ("feature_union", FeatureUnion(
-                    [   
-                        ('all_seletcted_features',AllFeatureSelector()),
-                        ('seletcted_features_lda', LinearDiscriminantAnalysis()),
-                        ("seletcted_features_svd", PCA(n_components=2)),
-                    ]
-            )),
-            ("classifier", RandomForestClassifier(random_state=42))
-        ]
-    )
+        steps=[("preprocessor",
+                ColumnTransformer(transformers=[(
+                    "IFS", StandardScaler(),
+                    features), ('age_scaler', StandardScaler(), ['age']),
+                                                ('sex_encoder',
+                                                 OneHotEncoder(
+                                                     handle_unknown='ignore'),
+                                                 ['gender'])])),
+               ("feature_union",
+                FeatureUnion([
+                    ('all_seletcted_features', AllFeatureSelector()),
+                    ('seletcted_features_lda', LinearDiscriminantAnalysis()),
+                    ("seletcted_features_svd", PCA(n_components=2)),
+                ])), ("classifier", RandomForestClassifier(random_state=42))])
 
     return ifs_pipeline
-    
 
 
 if __name__ == "__main__":
@@ -200,5 +198,5 @@ if __name__ == "__main__":
     pipeline = get_pipeline(rna_features)
 
     pipeline.fit(X_train, y_train)
-    
+
     print("baseline: {}".format(pipeline.score(X_test, y_test)))

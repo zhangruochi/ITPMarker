@@ -271,4 +271,4 @@ dependencies:
     - yarl==1.7.2
     - zc-lockfile==2.0
     - zipp==3.6.0
-prefix: /data/zhangruochi/miniconda3/envs/tryit
+prefix: /data/Users/miniconda3/envs/tryit

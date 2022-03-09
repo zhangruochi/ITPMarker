@@ -7,7 +7,7 @@ import pickle as pkl
 
 
 root_transcriptome = "platelets.txt"
-root_clinical = "20200518-anonymous.xlsx"
+root_clinical = "class-label.xlsx"
 
 
 transcriptome_data = pd.read_table(root_transcriptome,
@@ -17,7 +17,7 @@ transcriptome_data = pd.read_table(root_transcriptome,
 workbook = xlrd.open_workbook(root_clinical)
 workbook.sheet_names()
 worksheet_ITP = workbook.sheet_by_name('ITP')
-worksheet_normal = workbook.sheet_by_name('正常人')
+worksheet_normal = workbook.sheet_by_name('Control')
 
 
 def transform_func(item):
@@ -29,7 +29,7 @@ def excel_date(item):
         *xlrd.xldate_as_tuple(item.value, workbook.datemode))
 
 def age_func(row):
-    return float(row["年龄"].strip("岁"))
+    return float(row["age"])
 
 
 rows = []
@@ -41,9 +41,7 @@ for i in range(worksheet_ITP.nrows):
         row = [
             transform_func(row[0]),
             transform_func(row[1]),
-            transform_func(row[2]),
-            excel_date(row[3]),
-            transform_func(row[4])
+            transform_func(row[2])
         ]
     # break
     rows.append(row)
@@ -57,11 +55,12 @@ for i in range(worksheet_normal.nrows):
     rows.append(row)
 
 clinical_normal = pd.DataFrame(rows[1:], columns=rows[0])
+clinical_normal.loc[:, "age"] = clinical_normal.apply(age_func, axis=1)
+clinical_data = clinical_ITP.append(clinical_normal).set_index("ID")
+clinical_data.loc[:, "gender"] = clinical_data["gender"].astype('category')
 
 
-clinical_normal.loc[:, "年龄"] = clinical_normal.apply(age_func, axis=1)
-clinical_data = clinical_ITP.append(clinical_normal).set_index("样本编号")
-clinical_data.loc[:, "性别"] = clinical_data["性别"].astype('category')
+transcriptome_data = transcriptome_data.loc[clinical_data.index, :]
 
 
 with open("data.pkl", "wb") as f:
@@ -70,3 +69,10 @@ with open("data.pkl", "wb") as f:
             "clinical_data": clinical_data,
             "transcriptome_data": transcriptome_data
         }, f)
+
+print("clinical_data: ")
+print(clinical_data.shape)
+
+
+print("transcriptome_data: ")
+print(transcriptome_data.shape)
